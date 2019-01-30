@@ -8,7 +8,7 @@ spec:
   selector:
     matchLabels:
       app: guestbook
-  replicas: 3
+  replicas: 1
   template:
     metadata:
       labels:
@@ -17,6 +17,7 @@ spec:
       containers:
       - name: guestbook
         image: linsun/guestbook
+        imagePullPolicy: Always
         resources:
           requests:
             cpu: 100m
