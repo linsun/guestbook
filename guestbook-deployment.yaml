@@ -14,6 +14,7 @@ spec:
       labels:
         app: guestbook
     spec:
+      serviceAccountName: guestbook
       containers:
       - name: guestbook
         image: linsun/guestbook

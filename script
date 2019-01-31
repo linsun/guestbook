@@ -1,0 +1,111 @@
+# set analyzer mtls policy
+cat <<EOF | kubectl create -f -
+apiVersion: authentication.istio.io/v1alpha1
+kind: Policy
+metadata:
+  name: mtls-to-analyzer
+  namespace: default
+spec:
+  targets:
+  - name: analyzer
+  peers:
+  - mtls:
+EOF
+
+cat <<EOF | kubectl create -f -
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: route-with-mtls-for-analyzer
+  namespace: default
+spec:
+  host: "analyzer.default.svc.cluster.local"
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL
+EOF
+
+# set guestbook mtls policy
+cat <<EOF | kubectl create -f -
+apiVersion: authentication.istio.io/v1alpha1
+kind: Policy
+metadata:
+  name: mtls-to-guestbook
+  namespace: default
+spec:
+  targets:
+  - name: guestbook
+  peers:
+  - mtls:
+EOF
+
+cat <<EOF | kubectl apply -f -
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: destination-rule-guestbook
+spec:
+  host: guestbook
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL
+EOF
+
+# set animatedbook mtls policy
+cat <<EOF | kubectl create -f -
+apiVersion: authentication.istio.io/v1alpha1
+kind: Policy
+metadata:
+  name: mtls-to-animatedbook
+  namespace: default
+spec:
+  targets:
+  - name: animatedbook
+  peers:
+  - mtls:
+EOF
+
+cat <<EOF | kubectl apply -f -
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: animatedbook-rule-guestbook
+spec:
+  host: animatedbook
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL
+EOF
+
+
+cat <<EOF | kubectl create -f -
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: guestbook
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: analyzer
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: animatedbook
+EOF
+
+
+
+# default RBAC config for namespace default
+cat <<EOF | kubectl create -f -
+apiVersion: "rbac.istio.io/v1alpha1"
+kind: RbacConfig
+metadata:
+  name: default
+spec:
+  mode: 'ON_WITH_INCLUSION'
+  inclusion:
+    namespaces: ["default"]
+EOF
+
