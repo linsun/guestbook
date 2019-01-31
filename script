@@ -57,7 +57,7 @@ apiVersion: authentication.istio.io/v1alpha1
 kind: Policy
 metadata:
   name: mtls-to-animatedbook
-  namespace: default
+  namespace: books
 spec:
   targets:
   - name: animatedbook
@@ -65,17 +65,9 @@ spec:
   - mtls:
 EOF
 
-cat <<EOF | kubectl apply -f -
-apiVersion: networking.istio.io/v1alpha3
-kind: DestinationRule
-metadata:
-  name: animatedbook-rule-guestbook
-spec:
-  host: animatedbook
-  trafficPolicy:
-    tls:
-      mode: ISTIO_MUTUAL
-EOF
+kubectl apply -f books-gateway.yaml
+kubectl apply -f books-vs.yaml
+kubectl apply -f animatedbook-destination.yaml
 
 
 cat <<EOF | kubectl create -f -
@@ -98,7 +90,7 @@ EOF
 
 
 # default RBAC config for namespace default
-cat <<EOF | kubectl create -f -
+cat <<EOF | kubectl apply -f -
 apiVersion: "rbac.istio.io/v1alpha1"
 kind: RbacConfig
 metadata:
@@ -106,6 +98,73 @@ metadata:
 spec:
   mode: 'ON_WITH_INCLUSION'
   inclusion:
-    namespaces: ["default"]
+    namespaces: ["default", "books"]
 EOF
 
+cat <<EOF | kubectl apply -f -
+apiVersion: "rbac.istio.io/v1alpha1"
+kind: ServiceRole
+metadata:
+  name: service-viewer
+  namespace: default
+spec:
+  rules:
+  - services: ["*"]
+    methods: ["*"]
+    constraints:
+    - key: "destination.labels[app]"
+      values: ["guestbook", "analyzer"]
+EOF
+
+cat <<EOF | kubectl apply -f -
+apiVersion: "rbac.istio.io/v1alpha1"
+kind: ServiceRoleBinding
+metadata:
+  name: bind-service-viewer
+  namespace: default
+spec:
+  subjects:
+  - properties:
+      source.namespace: "istio-system"
+  - properties:
+      source.namespace: "default"
+  roleRef:
+    kind: ServiceRole
+    name: "service-viewer"
+EOF
+
+
+cat <<EOF | kubectl apply -f -
+apiVersion: "rbac.istio.io/v1alpha1"
+kind: ServiceRole
+metadata:
+  name: books-service-viewer
+  namespace: books
+spec:
+  rules:
+  - services: ["*"]
+    methods: ["*"]
+    constraints:
+    - key: "destination.labels[app]"
+      values: ["animatedbook"]
+EOF
+
+
+
+
+cat <<EOF | kubectl apply -f -
+apiVersion: "rbac.istio.io/v1alpha1"
+kind: ServiceRoleBinding
+metadata:
+  name: bind-books-service-viewer
+  namespace: books
+spec:
+  subjects:
+  - properties:
+      source.namespace: "istio-system"
+  - properties:
+      source.namespace: "books"
+  roleRef:
+    kind: ServiceRole
+    name: "books-service-viewer"
+EOF
