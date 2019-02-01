@@ -18,5 +18,5 @@ spec:
     - port: 8080
     route:
     - destination:
-        host: animatedbook.books.svc.cluster.local
+        host: animatedbook
 
