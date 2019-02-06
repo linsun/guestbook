@@ -39,6 +39,40 @@ kubectl delete pod -l app=analyzer
 kubectl delete pod -l app=guestbook
 kubectl delete pod -l app=animatedbook
 
+# set up service entry for animatedbook
+cat <<EOF | kubectl create -f -
+apiVersion: networking.istio.io/v1alpha3
+kind: ServiceEntry
+metadata:
+  name: giphy
+spec:
+  hosts:
+  - "api.giphy.com"
+  ports:
+  - number: 80
+    name: http
+    protocol: http
+  resolution: DNS
+EOF
+
+# set up service entry for analyzer
+cat <<EOF | kubectl create -f -
+apiVersion: networking.istio.io/v1alpha3
+kind: ServiceEntry
+metadata:
+  name: iam-watson
+spec:
+  hosts:
+  - iam.bluemix.net
+  - "*.watsonplatform.net"
+  ports:
+  - number: 443
+    name: https
+    protocol: HTTPS
+  resolution: NONE
+  location: MESH_EXTERNAL
+EOF
+
 # set analyzer mtls policy
 cat <<EOF | kubectl create -f -
 apiVersion: authentication.istio.io/v1alpha1
@@ -103,6 +137,8 @@ spec:
     kind: ServiceRole
     name: "analyzer-viewer"
 EOF
+
+# WAIT 15 seconds or so, animated book should not be able to talk to analyzer now
 
 
 # Kiali:
