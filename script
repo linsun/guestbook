@@ -41,6 +41,7 @@ kubectl delete pod -l app=analyzer
 kubectl delete pod -l app=guestbook
 kubectl delete pod -l app=animatedbook
 
+# NOTE the analyzer or animatedbook won't work now unless you set up the service entries
 # set up service entry for animatedbook
 cat <<EOF | kubectl create -f -
 apiVersion: networking.istio.io/v1alpha3
@@ -74,6 +75,8 @@ spec:
   resolution: NONE
   location: MESH_EXTERNAL
 EOF
+
+# guestbook and animatedbook should be working now with istio enabled
 
 # set analyzer mtls policy
 cat <<EOF | kubectl create -f -
