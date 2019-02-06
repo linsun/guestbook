@@ -19,6 +19,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"math/rand"
 	"net/http"
 	"os"
@@ -257,14 +258,16 @@ func findRedisURL() string {
 	host := os.Getenv("REDIS_MASTER_SERVICE_HOST")
 	port := os.Getenv("REDIS_MASTER_SERVICE_PORT")
 	password := os.Getenv("REDIS_MASTER_SERVICE_PASSWORD")
-	master_port := os.Getenv("REDIS_MASTER_PORT")
+	masterPort := os.Getenv("REDIS_MASTER_PORT")
 
+	url := ""
 	if host != "" && port != "" && password != "" {
-		return password + "@" + host + ":" + port
-	} else if master_port != "" {
-		return "redis-master:6379"
+		url = password + "@" + host + ":" + port
+	} else if masterPort != "" {
+		url = "redis-master:6379"
 	}
-	return ""
+	fmt.Printf("redis URL is %s\n", url)
+	return url
 }
 
 func main() {

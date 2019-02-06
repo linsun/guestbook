@@ -1,74 +1,11 @@
-# set analyzer mtls policy
-cat <<EOF | kubectl create -f -
-apiVersion: authentication.istio.io/v1alpha1
-kind: Policy
-metadata:
-  name: mtls-to-analyzer
-  namespace: default
-spec:
-  targets:
-  - name: analyzer
-  peers:
-  - mtls:
-EOF
+1. UI - managed istio.
+2. switch to another cluster via cli
+3. app working without using istio.
+4. enable sidecar via auto injection (enable namespace) and set a policy now with mtls.  policy will disable animatedbook working
+(try kubectl delete pod if it will work with auto injection)
 
-cat <<EOF | kubectl create -f -
-apiVersion: networking.istio.io/v1alpha3
-kind: DestinationRule
-metadata:
-  name: route-with-mtls-for-analyzer
-  namespace: default
-spec:
-  host: "analyzer.default.svc.cluster.local"
-  trafficPolicy:
-    tls:
-      mode: ISTIO_MUTUAL
-EOF
-
-# set guestbook mtls policy
-cat <<EOF | kubectl create -f -
-apiVersion: authentication.istio.io/v1alpha1
-kind: Policy
-metadata:
-  name: mtls-to-guestbook
-  namespace: default
-spec:
-  targets:
-  - name: guestbook
-  peers:
-  - mtls:
-EOF
-
-cat <<EOF | kubectl apply -f -
-apiVersion: networking.istio.io/v1alpha3
-kind: DestinationRule
-metadata:
-  name: destination-rule-guestbook
-spec:
-  host: guestbook
-  trafficPolicy:
-    tls:
-      mode: ISTIO_MUTUAL
-EOF
-
-# set animatedbook mtls policy
-cat <<EOF | kubectl create -f -
-apiVersion: authentication.istio.io/v1alpha1
-kind: Policy
-metadata:
-  name: mtls-to-animatedbook
-  namespace: books
-spec:
-  targets:
-  - name: animatedbook
-  peers:
-  - mtls:
-EOF
-
-kubectl apply -f books-gateway.yaml
-kubectl apply -f books-vs.yaml
-kubectl apply -f animatedbook-destination.yaml
-
+Step 2:
+# guestbook already installed
 
 cat <<EOF | kubectl create -f -
 apiVersion: v1
@@ -87,9 +24,50 @@ metadata:
   name: animatedbook
 EOF
 
+kubectl create -f guestbook/guestbook-deployment.yaml -f guestbook/guestbook-service.yaml
+kubectl create -f animatedbook/animatedbook-deployment.yaml -f animatedbook/animatedbook-service.yaml
+kubectl create -f analyzer/analyzer-deployment.yaml -f analyzer/analyzer-service.yaml
+kubectl create -f guestbook/redis-master-deployment.yaml -f guestbook/redis-master-service.yaml
+kubectl create -f guestbook/redis-slave-deployment.yaml -f guestbook/redis-slave-service.yaml
 
+Step 4:
+# set up auto inject for default namespace
+kubectl label namespace default istio-injection=enabled --overwrite
 
-# default RBAC config for namespace default
+# delete guestbook, analyzer, & animatedbook for auto injection
+kubectl delete pod -l app=analyzer
+kubectl delete pod -l app=guestbook
+kubectl delete pod -l app=animatedbook
+
+# set analyzer mtls policy
+cat <<EOF | kubectl create -f -
+apiVersion: authentication.istio.io/v1alpha1
+kind: Policy
+metadata:
+  name: mtls-to-analyzer
+  namespace: default
+spec:
+  targets:
+  - name: analyzer
+  peers:
+  - mtls:
+EOF
+
+# set analyzer mtls destination rule
+cat <<EOF | kubectl create -f -
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: route-with-mtls-for-analyzer
+  namespace: default
+spec:
+  host: "analyzer.default.svc.cluster.local"
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL
+EOF
+
+# enable RBAC config for analyzer service only
 cat <<EOF | kubectl apply -f -
 apiVersion: "rbac.istio.io/v1alpha1"
 kind: RbacConfig
@@ -98,73 +76,47 @@ metadata:
 spec:
   mode: 'ON_WITH_INCLUSION'
   inclusion:
-    namespaces: ["default", "books"]
+    services: ["analyzer.default.svc.cluster.local"]
 EOF
 
+# create analyzer viewer and rolebinding that allows access only from guestbook
 cat <<EOF | kubectl apply -f -
 apiVersion: "rbac.istio.io/v1alpha1"
 kind: ServiceRole
 metadata:
-  name: service-viewer
+  name: analyzer-viewer
   namespace: default
 spec:
   rules:
-  - services: ["*"]
-    methods: ["*"]
-    constraints:
-    - key: "destination.labels[app]"
-      values: ["guestbook", "analyzer"]
-EOF
-
-cat <<EOF | kubectl apply -f -
+  - services: ["analyzer.default.svc.cluster.local"]
+    methods: ["POST"]
+---
 apiVersion: "rbac.istio.io/v1alpha1"
 kind: ServiceRoleBinding
 metadata:
-  name: bind-service-viewer
+  name: bind-analyzer
   namespace: default
 spec:
   subjects:
-  - properties:
-      source.namespace: "istio-system"
-  - properties:
-      source.namespace: "default"
+  - user: "cluster.local/ns/default/sa/guestbook"
   roleRef:
     kind: ServiceRole
-    name: "service-viewer"
+    name: "analyzer-viewer"
 EOF
 
 
-cat <<EOF | kubectl apply -f -
-apiVersion: "rbac.istio.io/v1alpha1"
-kind: ServiceRole
-metadata:
-  name: books-service-viewer
-  namespace: books
-spec:
-  rules:
-  - services: ["*"]
-    methods: ["*"]
-    constraints:
-    - key: "destination.labels[app]"
-      values: ["animatedbook"]
-EOF
+# Kiali:
+kubectl -n istio-system port-forward $(kubectl -n istio-system get pod -l app=kiali -o jsonpath='{.items[0].metadata.name}') 20001:20001 &
 
+# Grafana:
+kubectl -n istio-system port-forward $(kubectl -n istio-system get pod -l app=grafana -o jsonpath='{.items[0].metadata.name}') 3000:3000 &
 
+# View auth policy etc:
+kubectl get policy
+kubectl get rbacConfig
+kubectl get ServiceRole
+kubectl get ServiceRoleBinding
 
-
-cat <<EOF | kubectl apply -f -
-apiVersion: "rbac.istio.io/v1alpha1"
-kind: ServiceRoleBinding
-metadata:
-  name: bind-books-service-viewer
-  namespace: books
-spec:
-  subjects:
-  - properties:
-      source.namespace: "istio-system"
-  - properties:
-      source.namespace: "books"
-  roleRef:
-    kind: ServiceRole
-    name: "books-service-viewer"
-EOF
+# clean up the database
+Guestbook uses redis, you may redeploy redis to clean it up.
+Animatedbook uses in memory db, you may restart animated book to clean it up.
