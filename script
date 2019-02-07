@@ -29,8 +29,6 @@ EOF
 kubectl create -f guestbook/guestbook-deployment.yaml -f guestbook/guestbook-service.yaml
 kubectl create -f animatedbook/animatedbook-deployment.yaml -f animatedbook/animatedbook-service.yaml
 kubectl create -f analyzer/analyzer-deployment.yaml -f analyzer/analyzer-service.yaml
-kubectl create -f guestbook/redis-master-deployment.yaml -f guestbook/redis-master-service.yaml
-kubectl create -f guestbook/redis-slave-deployment.yaml -f guestbook/redis-slave-service.yaml
 
 Step 4:
 # set up auto inject for default namespace
