@@ -36,11 +36,6 @@ Step 4:
 # set up auto inject for default namespace
 kubectl label namespace default istio-injection=enabled --overwrite
 
-# delete guestbook, analyzer, & animatedbook for auto injection
-kubectl delete pod -l app=analyzer
-kubectl delete pod -l app=guestbook
-kubectl delete pod -l app=animatedbook
-
 # NOTE the analyzer or animatedbook won't work now unless you set up the service entries
 # set up service entry for animatedbook
 cat <<EOF | kubectl create -f -
@@ -75,6 +70,11 @@ spec:
   resolution: NONE
   location: MESH_EXTERNAL
 EOF
+
+# delete guestbook, analyzer, & animatedbook for auto injection
+kubectl delete pod -l app=analyzer
+kubectl delete pod -l app=guestbook
+kubectl delete pod -l app=animatedbook
 
 # guestbook and animatedbook should be working now with istio enabled
 
